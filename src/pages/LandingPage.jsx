@@ -7,6 +7,8 @@ import { useAppLanguage } from "../context/AppLanguageContext";
 import { cefrLevels, nativeLanguages, teachingLanguages } from "../data/languages";
 import { startStripeDonation } from "../lib/donation";
 
+import { landingFrenchQuiz } from "../data/landingFrenchQuiz";
+
 function LandingPage() {
   const { t } = useAppLanguage();
   const navigate = useNavigate();
@@ -14,6 +16,36 @@ function LandingPage() {
   const [teachingCode, setTeachingCode] = useState("en");
   const [cefrLevel, setCefrLevel] = useState("A1");
   const [activePopup, setActivePopup] = useState(null);
+
+  // Quiz state for landing page
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [selectedChoice, setSelectedChoice] = useState(null);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizFinished, setQuizFinished] = useState(false);
+
+  const currentQuiz = landingFrenchQuiz[quizIndex];
+
+  function handleQuizChoice(choice) {
+    setSelectedChoice(choice);
+    if (choice === currentQuiz.answer) {
+      setQuizScore((prev) => prev + 1);
+    }
+    setTimeout(() => {
+      if (quizIndex < landingFrenchQuiz.length - 1) {
+        setQuizIndex((prev) => prev + 1);
+        setSelectedChoice(null);
+      } else {
+        setQuizFinished(true);
+      }
+    }, 700);
+  }
+
+  function handleQuizRestart() {
+    setQuizIndex(0);
+    setSelectedChoice(null);
+    setQuizScore(0);
+    setQuizFinished(false);
+  }
 
   const nativeLabel = useMemo(() => {
     return nativeLanguages.find((item) => item.code === nativeCode)?.nativeLabel || "";
@@ -150,6 +182,46 @@ function LandingPage() {
             {t("enterLearningGround")}
           </button>
         </div>
+      </section>
+
+      {/* Quiz Section: 8 French MCQs */}
+      <section className="card landing-quiz modern-card">
+        <h2>French Quick Quiz</h2>
+        {quizFinished ? (
+          <div className="quiz-results">
+            <p>You scored {quizScore} out of {landingFrenchQuiz.length}!</p>
+            <button className="primary" onClick={handleQuizRestart}>Try Again</button>
+          </div>
+        ) : (
+          <>
+            <p><strong>Question {quizIndex + 1} of {landingFrenchQuiz.length}</strong></p>
+            <p>{currentQuiz.question}</p>
+            <div className="quiz-choices">
+              {currentQuiz.choices.map((choice) => {
+                let btnClass = "quiz-choice-btn";
+                if (selectedChoice === choice) {
+                  btnClass += choice === currentQuiz.answer ? " correct" : " wrong";
+                }
+                return (
+                  <button
+                    key={choice}
+                    className={btnClass}
+                    onClick={() => !selectedChoice && handleQuizChoice(choice)}
+                    disabled={!!selectedChoice}
+                    aria-pressed={selectedChoice === choice}
+                  >
+                    {choice}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedChoice && (
+              <p className="quiz-feedback">
+                {selectedChoice === currentQuiz.answer ? "Correct!" : `Wrong! Correct answer: ${currentQuiz.answer}`}
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       <section className="card summary modern-card">
