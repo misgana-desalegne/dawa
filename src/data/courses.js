@@ -55,8 +55,9 @@ function buildChoices(entries, index, targetCode) {
   const answer = pickTargetText(entries[index], targetCode);
   const firstDistractor = pickTargetText(entries[(index + 3) % entries.length], targetCode);
   const secondDistractor = pickTargetText(entries[(index + 7) % entries.length], targetCode);
+  const thirdDistractor = pickTargetText(entries[(index + 11) % entries.length], targetCode);
 
-  return [answer, firstDistractor, secondDistractor];
+  return [answer, firstDistractor, secondDistractor, thirdDistractor].sort(() => Math.random() - 0.5);
 }
 
 function buildLessonsForLevel(nativeCode, targetCode, level) {

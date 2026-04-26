@@ -2,56 +2,76 @@ import React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppLanguage } from "../context/AppLanguageContext";
 
-function QuizPanel({ lesson, onFinish }) {
+function QuizPanel({ lesson, nativeLanguage, targetLanguage, onFinish }) {
   const { t } = useAppLanguage();
-  const practiceWords = useMemo(() => {
-    return lesson.questions.slice(0, 5).map((question) => ({
-        word: question.answer,
-        meaning: question.prompt,
-        exampleSentence: question.exampleSentence
-      }));
-  }, [lesson]);
-
-  const [activeWord, setActiveWord] = useState(null);
-  const [practicedWords, setPracticedWords] = useState({});
+  const practiceQuestions = useMemo(() => lesson.questions.slice(0, 5), [lesson]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedChoice, setSelectedChoice] = useState("");
+  const [answeredMap, setAnsweredMap] = useState({});
+  const [feedbackState, setFeedbackState] = useState(null);
 
   useEffect(() => {
-    setActiveWord(null);
-    setPracticedWords({});
+    setCurrentIndex(0);
+    setSelectedChoice("");
+    setAnsweredMap({});
+    setFeedbackState(null);
   }, [lesson.id]);
 
   useEffect(() => {
-    if (!activeWord) {
-      return undefined;
-    }
+    setSelectedChoice("");
+    setFeedbackState(null);
+  }, [currentIndex]);
 
-    const timerId = window.setTimeout(() => {
-      setActiveWord(null);
-    }, 3200);
-
-    return () => window.clearTimeout(timerId);
-  }, [activeWord]);
-
-  const practicedCount = Object.keys(practicedWords).length;
-  const totalWords = practiceWords.length;
+  const currentQuestion = practiceQuestions[currentIndex];
+  const practicedCount = Object.keys(answeredMap).length;
+  const totalWords = practiceQuestions.length;
   const allPracticed = totalWords > 0 && practicedCount === totalWords;
-  const teachingLang = lesson.id.startsWith("fr") ? "fr-FR" : lesson.id.startsWith("de") ? "de-DE" : "en-US";
+  const currentResult = answeredMap[currentIndex];
+  const currentCorrect = currentResult?.isCorrect;
+  const nativeLabel = nativeLanguage?.nativeLabel || nativeLanguage?.label || "";
+  const targetLabel = targetLanguage?.nativeLabel || targetLanguage?.label || "";
+
+  const speakingLang = targetLanguage?.code === "fr" ? "fr-FR" : targetLanguage?.code === "de" ? "de-DE" : "en-US";
 
   function pronounceWord(word) {
     if (!("speechSynthesis" in window)) {
       return;
     }
+
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = teachingLang;
+    utterance.lang = speakingLang;
     utterance.rate = 0.92;
     window.speechSynthesis.speak(utterance);
   }
 
-  function handleWordClick(item) {
-    setActiveWord(item);
-    setPracticedWords((prev) => ({ ...prev, [item.word]: true }));
-    pronounceWord(item.word);
+  function handleChoiceSelect(choice) {
+    if (currentCorrect) {
+      return;
+    }
+
+    const isCorrect = choice === currentQuestion.answer;
+    setSelectedChoice(choice);
+    setFeedbackState(isCorrect ? "correct" : "incorrect");
+
+    if (isCorrect) {
+      setAnsweredMap((prev) => ({
+        ...prev,
+        [currentIndex]: {
+          choice,
+          isCorrect: true
+        }
+      }));
+      pronounceWord(currentQuestion.answer);
+    }
+  }
+
+  function handleNext() {
+    if (currentIndex + 1 >= totalWords) {
+      return;
+    }
+
+    setCurrentIndex((index) => index + 1);
   }
 
   function handleFinishLesson() {
@@ -67,45 +87,89 @@ function QuizPanel({ lesson, onFinish }) {
     });
   }
 
+  if (!currentQuestion) {
+    return null;
+  }
+
   return (
     <section className="card quiz-panel">
       <div className="quiz-top-row">
-        <h2>{lesson.title}</h2>
-        <p>
-          {t("wordsPracticed")}: {practicedCount}/{totalWords}
-        </p>
+        <div>
+          <h2>{lesson.title}</h2>
+          <p className="question-label">
+            {t("translateFromTo")}: {nativeLabel} → {targetLabel}
+          </p>
+        </div>
+
+        <div className="quiz-meta">
+          <span>
+            {t("wordsPracticed")}: {practicedCount}/{totalWords}
+          </span>
+          <span>
+            {t("question")} {currentIndex + 1}/{totalWords}
+          </span>
+        </div>
       </div>
 
-      <p className="practice-label">{t("practiceHint")}</p>
+      <p className="practice-label">{t("selectAnswer")}</p>
 
-      <div className="word-button-list">
-        {practiceWords.map((item) => {
-          const isActive = activeWord?.word === item.word;
+      <div className="question-card">
+        <p className="question-prompt">{currentQuestion.prompt}</p>
 
-          return (
-            <div key={item.word} className="word-cell">
+        <div className="choice-grid">
+          {currentQuestion.choices.map((choice) => {
+            const isSelected = selectedChoice === choice;
+            const isCorrectChoice = choice === currentQuestion.answer;
+            const classNames = ["choice-button"];
+
+            if (isSelected && feedbackState === "correct") {
+              classNames.push("correct");
+            }
+            if (isSelected && feedbackState === "incorrect") {
+              classNames.push("incorrect");
+            }
+            if (currentCorrect && isCorrectChoice) {
+              classNames.push("correct");
+            }
+
+            return (
               <button
                 type="button"
-                className={practicedWords[item.word] ? "word-button practiced" : "word-button"}
-                onClick={() => handleWordClick(item)}
+                key={choice}
+                className={classNames.join(" ")}
+                onClick={() => handleChoiceSelect(choice)}
               >
-                {item.word}
+                {choice}
               </button>
+            );
+          })}
+        </div>
 
-              {isActive && (
-                <aside className="meaning-popup local" role="status" aria-live="polite">
-                  <p className="meaning-native">{activeWord.meaning}</p>
-                  <p className="meaning-sentence">{item.exampleSentence}</p>
-                </aside>
-              )}
-            </div>
-          );
-        })}
+        <div className="choice-footer">
+          <p className={`choice-feedback ${feedbackState === "incorrect" ? "incorrect" : ""}`}>
+            {feedbackState === "correct" && t("correctAnswer")}
+            {feedbackState === "incorrect" && t("incorrectAnswer")}
+          </p>
+          <button type="button" className="secondary listen-button" onClick={() => pronounceWord(currentQuestion.answer)}>
+            {t("listenWord")}
+          </button>
+        </div>
+
+        {currentCorrect && (
+          <p className="meaning-sentence">
+            <strong>{t("exampleSentence")}</strong> {currentQuestion.exampleSentence}
+          </p>
+        )}
       </div>
 
       <div className="quiz-actions-sticky">
         <p className="action-hint">{t("finishLessonHint")}</p>
         <div className="quiz-actions">
+          {currentCorrect && currentIndex + 1 < totalWords && (
+            <button type="button" className="secondary" onClick={handleNext}>
+              {t("nextQuestion")}
+            </button>
+          )}
           <button type="button" className="primary" onClick={handleFinishLesson} disabled={!allPracticed}>
             {t("finishLesson")}
           </button>
