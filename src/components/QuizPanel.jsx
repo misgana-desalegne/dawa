@@ -94,12 +94,7 @@ function QuizPanel({ lesson, nativeLanguage, targetLanguage, onFinish }) {
   return (
     <section className="card quiz-panel">
       <div className="quiz-top-row">
-        <div>
-          <h2>{lesson.title}</h2>
-          <p className="question-label">
-            {t("translateFromTo")}: {nativeLabel} → {targetLabel}
-          </p>
-        </div>
+       
 
         <div className="quiz-meta">
           <span>

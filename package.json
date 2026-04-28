@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "homepage": "https://misgana-desalegne.github.io/DawaQuanqa/",
+  "homepage": "/DawaQuanqa",
   "scripts": {
     "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
@@ -15,12 +15,16 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.0",
+    "nodemailer": "^6.9.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.1",
-    "stripe": "^17.5.0"
+    "stripe": "^17.5.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

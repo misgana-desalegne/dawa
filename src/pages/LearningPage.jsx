@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import QuizPanel from "../components/QuizPanel";
 import SectionChain from "../components/SectionChain";
 import TitleBar from "../components/TitleBar";
+import FeedbackPanel from "../components/FeedbackPanel";
 import { useAppLanguage } from "../context/AppLanguageContext";
 import { getCourse } from "../data/courses";
 import { nativeLanguages, teachingLanguages } from "../data/languages";
@@ -128,67 +129,58 @@ function LearningPage() {
         </Link>
       </TitleBar>
 
-      {/* Hero Section with Course Info */}
-      <section className="learning-hero">
-        <div className="hero-content">
-          <h1>{activeCourse?.title}</h1>
-          <div className="hero-metadata">
-            <span className="meta-badge">{activeNativeLanguage?.label}</span>
-            <span className="meta-arrow">→</span>
-            <span className="meta-badge">{activeTargetLanguage?.label}</span>
-            <span className="meta-divider">·</span>
-            <span className="meta-level">{level}</span>
-          </div>
-          <p className="hero-description">Level {level} · {activeCourse?.lessons.length} sections</p>
-        </div>
-        <button type="button" className="secondary" onClick={() => navigate("/")}>
-          {t("changeRoute")}
-        </button>
-      </section>
-
-      {/* Progress Overview */}
-      <section className="card progress-overview modern-card">
-        <div className="progress-stats">
-          <div className="stat-item">
-            <span className="stat-label">{t("sections")}</span>
-            <span className="stat-value">{completedCount}/{activeCourse?.lessons.length}</span>
-          </div>
-          <div className="progress-bar-container">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${activeCourse?.lessons?.length ? (completedCount / activeCourse.lessons.length) * 100 : 0}%` }}
-              ></div>
+      {/* Combined Course Overview Section */}
+      <section className="card course-overview modern-card">
+        <div className="overview-header">
+          <div className="course-info">
+            <h2>{activeCourse?.title}</h2>
+            <div className="course-metadata">
+              <span className="meta-badge">{activeNativeLanguage?.label}</span>
+              <span className="meta-arrow">→</span>
+              <span className="meta-badge">{activeTargetLanguage?.label}</span>
+              <span className="meta-divider">·</span>
+              <span className="meta-level">{level}</span>
+              <span className="meta-divider">·</span>
+              <span className="meta-sections">{activeCourse?.lessons.length} sections</span>
             </div>
           </div>
+          <button type="button" className="change-route-btn" onClick={() => navigate("/")}>
+            {t("changeRoute")}
+          </button>
+        </div>
+
+        <div className="overview-content">
+          <div className="progress-section">
+            <div className="progress-stats">
+              <span className="progress-label">{t("sections")}</span>
+              <span className="progress-value">{completedCount}/{activeCourse?.lessons.length}</span>
+            </div>
+            <div className="progress-bar-container">
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${activeCourse?.lessons?.length ? (completedCount / activeCourse.lessons.length) * 100 : 0}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          {activeCourse?.lessons.length > 0 && (
+            <div className="sections-section">
+              <div className="sections-header">
+                <h3>{t("sectionChain")}</h3>
+                <span className="sections-hint">{t("sectionHint")}</span>
+              </div>
+              <SectionChain
+                lessons={activeCourse.lessons}
+                completedLessons={completedLessons}
+                completedCount={completedCount}
+                onSelectSection={setSelectedLessonId}
+              />
+            </div>
+          )}
         </div>
       </section>
-
-      {/* Section Chain */}
-      {activeCourse?.lessons.length > 0 && (
-        <section className="card section-path modern-card">
-          <h2>{t("sectionChain")}</h2>
-          <p className="subtext">{t("sectionHint")}</p>
-          <SectionChain
-            lessons={activeCourse.lessons}
-            completedLessons={completedLessons}
-            completedCount={completedCount}
-            onSelectSection={setSelectedLessonId}
-          />
-        </section>
-      )}
-
-      {/* Current Lesson Summary */}
-      {selectedLesson && (
-        <section className="card lesson-summary modern-card">
-          <div className="lesson-header">
-            <h2>{t("currentLesson")}</h2>
-            <span className="lesson-badge">In Progress</span>
-          </div>
-          <p className="lesson-title">{selectedLesson.title}</p>
-          <p className="lesson-description">{t("selectedLessonHint")}</p>
-        </section>
-      )}
 
       {/* Quiz Panel */}
       {selectedLesson && (
@@ -274,6 +266,9 @@ function LearningPage() {
           </section>
         </div>
       )}
+
+      {/* Feedback Section */}
+      <FeedbackPanel />
     </main>
   );
 }

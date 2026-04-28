@@ -1,7 +1,12 @@
 import express from "express";
 import dotenv from "dotenv";
 import Stripe from "stripe";
+import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
+import { v4 as uuidv4 } from "uuid";
 import { readStripeStore, writeStripeStore } from "./stripeStore.js";
+import { findUserByEmail, findUserById, addUser, updateUser } from "./userStore.js";
+import { authMiddleware, generateToken, verifyToken } from "./authMiddleware.js";
 
 dotenv.config();
 
@@ -9,6 +14,7 @@ const app = express();
 const port = Number(process.env.PORT || 8787);
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
+const jwtSecret = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 const hasUsableSecretKey = Boolean(stripeSecretKey)
   && !stripeSecretKey.includes("${")
   && stripeSecretKey.startsWith("sk_");
@@ -123,6 +129,220 @@ app.get("/api/stripe/status", async (_req, res) => {
     priceId: store.priceId,
     lastCheckoutSessionCompleted: store.lastCheckoutSessionCompleted
   });
+});
+
+// Feedback endpoint
+app.post("/api/feedback", async (req, res) => {
+  try {
+    const { name, email, comment } = req.body;
+
+    if (!name || !email || !comment) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Configure email transporter
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    // Email to admin
+    const adminEmailOptions = {
+      from: process.env.EMAIL_USER,
+      to: "misgana21son@gmail.com",
+      subject: `New Feedback from ${name}`,
+      html: `
+        <h2>New Feedback Received</h2>
+        <p><strong>From:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong></p>
+        <p>${comment.replace(/\n/g, "<br>")}</p>
+        <hr>
+        <p><small>This email was sent from the Dawalinqo Learning Platform</small></p>
+      `
+    };
+
+    // Send admin email
+    await transporter.sendMail(adminEmailOptions);
+
+    // Optional: Send confirmation email to user
+    const userEmailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Thank you for your feedback",
+      html: `
+        <h2>Thank You, ${name}!</h2>
+        <p>We received your feedback and appreciate your input. We'll review it and continue improving Dawalinqo.</p>
+        <p>Best regards,<br>The Dawalinqo Team</p>
+      `
+    };
+
+    await transporter.sendMail(userEmailOptions);
+
+    res.status(200).json({ message: "Feedback sent successfully" });
+  } catch (error) {
+    console.error("Feedback error:", error);
+    res.status(500).json({ 
+      message: "Failed to send feedback. Please check that EMAIL_USER and EMAIL_PASSWORD are configured."
+    });
+  }
+});
+
+// === Authentication Endpoints ===
+
+// User Registration
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { name, email, password, passwordConfirm } = req.body;
+
+    // Validation
+    if (!name || !email || !password || !passwordConfirm) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Check if user already exists
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ message: "Email already registered" });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const newUser = {
+      id: uuidv4(),
+      name,
+      email,
+      password: hashedPassword,
+      createdAt: new Date().toISOString()
+    };
+
+    await addUser(newUser);
+
+    // Generate token
+    const token = generateToken(newUser.id, jwtSecret);
+
+    res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email
+      }
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Registration failed" });
+  }
+});
+
+// User Login
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Find user
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Generate token
+    const token = generateToken(user.id, jwtSecret);
+
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Login failed" });
+  }
+});
+
+// Get Current User (protected route example)
+app.get("/api/auth/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await findUserById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+});
+
+// Update User Profile (protected route)
+app.put("/api/auth/profile", authMiddleware, async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const updatedUser = await updateUser(req.userId, { name });
+
+    res.json({
+      message: "Profile updated successfully",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email
+      }
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ message: "Failed to update profile" });
+  }
 });
 
 app.listen(port, () => {

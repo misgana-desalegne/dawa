@@ -4,6 +4,8 @@ import InfoPage from "./components/InfoPage";
 import { AppLanguageProvider, useAppLanguage } from "./context/AppLanguageContext";
 import LandingPage from "./pages/LandingPage";
 import LearningPage from "./pages/LearningPage";
+import SignupPage from "./pages/SignupPage";
+import LoginPage from "./pages/LoginPage";
 
 function AppRoutes() {
   const { t } = useAppLanguage();
@@ -17,38 +19,32 @@ function AppRoutes() {
     }
 
     handledReloadRedirectRef.current = true;
+
+    // Handle GitHub Pages SPA redirect
+    const searchParams = new URLSearchParams(location.search);
+    const redirectPath = searchParams.get('/');
+
+    if (redirectPath) {
+      // Remove the leading slash if present and reconstruct the path
+      const cleanPath = redirectPath.startsWith('/') ? redirectPath : '/' + redirectPath;
+      navigate(cleanPath, { replace: true });
+      return;
+    }
+
     const entries = globalThis.performance?.getEntriesByType?.("navigation") || [];
     const isReload = entries[0]?.type === "reload";
 
     if (isReload && location.pathname !== "/") {
       navigate("/", { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.search, navigate]);
 
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/learn" element={<LearningPage />} />
-      <Route
-        path="/signup"
-        element={
-          <InfoPage
-            title={t("signupTitle")}
-            description={t("signupBody")}
-            primaryCtaLabel={t("createAccount")}
-          />
-        }
-      />
-      <Route
-        path="/login"
-        element={
-          <InfoPage
-            title={t("loginTitle")}
-            description={t("loginBody")}
-            primaryCtaLabel={t("loginAction")}
-          />
-        }
-      />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route
         path="/about"
         element={

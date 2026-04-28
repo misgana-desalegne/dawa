@@ -5,6 +5,8 @@ import { useAppLanguage } from "../context/AppLanguageContext";
 import { cefrLevels, nativeLanguages, teachingLanguages } from "../data/languages";
 import { startStripeDonation } from "../lib/donation";
 import { landingFrenchQuiz } from "../data/landingFrenchQuiz";
+import SignupPage from "./SignupPage";
+import LoginPage from "./LoginPage";
 
 function LandingPage() {
   const { t } = useAppLanguage();
@@ -81,19 +83,6 @@ function LandingPage() {
     { label: t("navLogin"), key: "login", type: "popup" },
     { label: t("navDonate"), key: "donate", type: "action" }
   ];
-
-  const popupContent = {
-    signup: {
-      title: t("popupSignupTitle"),
-      description: t("popupSignupBody"),
-      action: t("createAccount")
-    },
-    login: {
-      title: t("popupLoginTitle"),
-      description: t("popupLoginBody"),
-      action: t("loginAction")
-    }
-  };
 
   return (
     <main className="app-shell">
@@ -259,7 +248,6 @@ function LandingPage() {
             className="popup-card"
             role="dialog"
             aria-modal="true"
-            aria-label={popupContent[activePopup].title}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -270,23 +258,19 @@ function LandingPage() {
             >
               x
             </button>
-            <h2>{popupContent[activePopup].title}</h2>
-            <p>{popupContent[activePopup].description}</p>
-
-            {(activePopup === "signup" || activePopup === "login") && (
-              <form className="popup-form">
-                <input type="email" placeholder={t("popupEmail")} aria-label={t("popupEmail")} />
-                <input type="password" placeholder={t("popupPassword")} aria-label={t("popupPassword")} />
-              </form>
+            {activePopup === "signup" ? (
+              <SignupPage
+                popupMode
+                onClose={() => setActivePopup(null)}
+                onSwitch={() => setActivePopup("login")}
+              />
+            ) : (
+              <LoginPage
+                popupMode
+                onClose={() => setActivePopup(null)}
+                onSwitch={() => setActivePopup("signup")}
+              />
             )}
-
-            <button
-              type="button"
-              className="primary popup-action-btn"
-              onClick={() => setActivePopup(null)}
-            >
-              {popupContent[activePopup].action}
-            </button>
           </section>
         </div>
       )}
