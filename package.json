@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "homepage": "/DawaQuanqa",
+  "homepage": "/dawa",
   "scripts": {
     "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
