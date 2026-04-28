@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig(({ command }) => ({
-  base: command === "build" ? "/DawaQuanqa/" : "/",
+  base: command === "build" ? "/dawa/" : "/",
   server: {
     port: 5173,
     proxy: {
