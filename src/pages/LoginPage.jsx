@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppLanguage } from "../context/AppLanguageContext";
+import { useAuth } from "../context/AuthContext";
 
 function LoginPage({ popupMode = false, onClose, onSwitch }) {
   const { t } = useAppLanguage();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
@@ -39,8 +41,7 @@ function LoginPage({ popupMode = false, onClose, onSwitch }) {
         throw new Error(data.message || "Login failed");
       }
 
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      login(data.user, data.token);
 
       if (popupMode) {
         if (onClose) onClose();

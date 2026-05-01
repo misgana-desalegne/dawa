@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { findUserById } from "./userStore.js";
 
 export function verifyToken(token, secret) {
   try {
@@ -25,5 +26,27 @@ export function authMiddleware(req, res, next) {
   }
 
   req.userId = decoded.userId;
+  next();
+}
+
+export async function adminMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  const decoded = verifyToken(token, process.env.JWT_SECRET);
+  if (!decoded) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  const user = await findUserById(decoded.userId);
+  if (!user || user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+
+  req.userId = decoded.userId;
+  req.user = user;
   next();
 }

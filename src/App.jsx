@@ -1,11 +1,14 @@
 import React, { useEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import InfoPage from "./components/InfoPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLanguageProvider, useAppLanguage } from "./context/AppLanguageContext";
+import { AuthProvider } from "./context/AuthContext";
 import LandingPage from "./pages/LandingPage";
 import LearningPage from "./pages/LearningPage";
 import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
+import AdminPage from "./pages/AdminPage";
 
 function AppRoutes() {
   const { t } = useAppLanguage();
@@ -45,6 +48,7 @@ function AppRoutes() {
       <Route path="/learn" element={<LearningPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminPage /></ProtectedRoute>} />
       <Route
         path="/about"
         element={
@@ -65,7 +69,9 @@ function AppRoutes() {
 function App() {
   return (
     <AppLanguageProvider>
-      <AppRoutes />
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </AppLanguageProvider>
   );
 }

@@ -5,8 +5,8 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { readStripeStore, writeStripeStore } from "./stripeStore.js";
-import { findUserByEmail, findUserById, addUser, updateUser } from "./userStore.js";
-import { authMiddleware, generateToken, verifyToken } from "./authMiddleware.js";
+import { findUserByEmail, findUserById, addUser, updateUser, getAllUsers, deleteUser, setUserRole } from "./userStore.js";
+import { authMiddleware, adminMiddleware, generateToken, verifyToken } from "./authMiddleware.js";
 
 dotenv.config();
 
@@ -251,7 +251,8 @@ app.post("/api/auth/register", async (req, res) => {
       user: {
         id: newUser.id,
         name: newUser.name,
-        email: newUser.email
+        email: newUser.email,
+        role: newUser.role || "user"
       }
     });
   } catch (error) {
@@ -290,7 +291,8 @@ app.post("/api/auth/login", async (req, res) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -311,7 +313,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -336,12 +339,168 @@ app.put("/api/auth/profile", authMiddleware, async (req, res) => {
       user: {
         id: updatedUser.id,
         name: updatedUser.name,
-        email: updatedUser.email
+        email: updatedUser.email,
+        role: updatedUser.role
       }
     });
   } catch (error) {
     console.error("Update user error:", error);
     res.status(500).json({ message: "Failed to update profile" });
+  }
+});
+
+// Change Password (protected route)
+app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword, newPasswordConfirm } = req.body;
+
+    if (!currentPassword || !newPassword || !newPasswordConfirm) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      return res.status(400).json({ message: "New passwords do not match" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const user = await findUserById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await updateUser(req.userId, { password: hashedPassword });
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Failed to change password" });
+  }
+});
+
+// === Admin Endpoints ===
+
+// Get All Users (admin only)
+app.get("/api/admin/users", adminMiddleware, async (req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json({ users });
+  } catch (error) {
+    console.error("Get users error:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+// Get User Details (admin only)
+app.get("/api/admin/users/:id", adminMiddleware, async (req, res) => {
+  try {
+    const user = await findUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+});
+
+// Delete User (admin only)
+app.delete("/api/admin/users/:id", adminMiddleware, async (req, res) => {
+  try {
+    // Prevent admin from deleting themselves
+    if (req.params.id === req.userId) {
+      return res.status(400).json({ message: "Cannot delete your own account" });
+    }
+
+    const user = await findUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await deleteUser(req.params.id);
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
+
+// Update User Role (admin only)
+app.put("/api/admin/users/:id/role", adminMiddleware, async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
+
+    // Prevent admin from changing their own role
+    if (req.params.id === req.userId) {
+      return res.status(400).json({ message: "Cannot change your own role" });
+    }
+
+    const user = await findUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const updatedUser = await setUserRole(req.params.id, role);
+
+    res.json({
+      message: "User role updated successfully",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role
+      }
+    });
+  } catch (error) {
+    console.error("Update role error:", error);
+    res.status(500).json({ message: error.message || "Failed to update user role" });
+  }
+});
+
+// Admin Check (check if user is admin)
+app.get("/api/admin/check", authMiddleware, async (req, res) => {
+  try {
+    const user = await findUserById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      isAdmin: user.role === "admin",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("Admin check error:", error);
+    res.status(500).json({ message: "Failed to check admin status" });
   }
 });
 
