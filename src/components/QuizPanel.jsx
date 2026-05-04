@@ -95,7 +95,6 @@ function QuizPanel({ lesson, nativeLanguage, targetLanguage, onFinish }) {
     <section className="card quiz-panel">
       <div className="quiz-top-row">
        
-
         <div className="quiz-meta">
           <span>
             {t("wordsPracticed")}: {practicedCount}/{totalWords}
@@ -161,11 +160,11 @@ function QuizPanel({ lesson, nativeLanguage, targetLanguage, onFinish }) {
         <p className="action-hint">{t("finishLessonHint")}</p>
         <div className="quiz-actions">
           {currentCorrect && currentIndex + 1 < totalWords && (
-            <button type="button" className="secondary" onClick={handleNext}>
+            <button type="button" className="primary" onClick={handleNext}>
               {t("nextQuestion")}
             </button>
           )}
-          <button type="button" className="primary" onClick={handleFinishLesson} disabled={!allPracticed}>
+          <button type="button" className="secondary" onClick={handleFinishLesson} disabled={!allPracticed}>
             {t("finishLesson")}
           </button>
         </div>

@@ -41,7 +41,7 @@ function pickNativeText(entry, nativeCode) {
 
 function buildExampleSentence(word, targetCode) {
   if (targetCode === "fr") {
-    return `J'utilise le mot "${word}" dans une phrase complete.`;
+    return `J'utilise le mot "${word}" dans une phrase complète.`;
   }
 
   if (targetCode === "de") {

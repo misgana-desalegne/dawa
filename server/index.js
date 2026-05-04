@@ -1,3 +1,10 @@
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 import express from "express";
 import dotenv from "dotenv";
 import Stripe from "stripe";
@@ -5,7 +12,7 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { readStripeStore, writeStripeStore } from "./stripeStore.js";
-import { findUserByEmail, findUserById, addUser, updateUser, getAllUsers, deleteUser, setUserRole } from "./userStore.js";
+import { findUserByEmail, findUserById, addUser, updateUser, getAllUsers, deleteUser, setUserRole, addFeedback, getAllFeedback, getFeedbackById, deleteFeedback, updateFeedbackStatus } from "./userStore.js";
 import { authMiddleware, adminMiddleware, generateToken, verifyToken } from "./authMiddleware.js";
 
 dotenv.config();
@@ -145,6 +152,19 @@ app.post("/api/feedback", async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
+
+    // Save feedback to database
+    const feedbackId = uuidv4();
+    const feedback = {
+      id: feedbackId,
+      name,
+      email,
+      comment,
+      createdAt: new Date().toISOString(),
+      status: 'new'
+    };
+    
+    await addFeedback(feedback);
 
     // Configure email transporter
     const transporter = nodemailer.createTransport({
@@ -503,6 +523,95 @@ app.get("/api/admin/check", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Failed to check admin status" });
   }
 });
+
+// === Admin Feedback Endpoints ===
+
+// Get All Feedback (admin only)
+app.get("/api/admin/feedback", adminMiddleware, async (req, res) => {
+  try {
+    const feedback = await getAllFeedback();
+    res.json({ feedback, count: feedback.length });
+  } catch (error) {
+    console.error("Get feedback error:", error);
+    res.status(500).json({ message: "Failed to fetch feedback" });
+  }
+});
+
+// Get Feedback by ID (admin only)
+app.get("/api/admin/feedback/:id", adminMiddleware, async (req, res) => {
+  try {
+    const feedback = await getFeedbackById(req.params.id);
+    if (!feedback) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    res.json({ feedback });
+  } catch (error) {
+    console.error("Get feedback error:", error);
+    res.status(500).json({ message: "Failed to fetch feedback" });
+  }
+});
+
+// Delete Feedback (admin only)
+app.delete("/api/admin/feedback/:id", adminMiddleware, async (req, res) => {
+  try {
+    const feedback = await getFeedbackById(req.params.id);
+    if (!feedback) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    
+    await deleteFeedback(req.params.id);
+    res.json({ message: "Feedback deleted successfully" });
+  } catch (error) {
+    console.error("Delete feedback error:", error);
+    res.status(500).json({ message: "Failed to delete feedback" });
+  }
+});
+
+// Update Feedback Status (admin only)
+app.put("/api/admin/feedback/:id/status", adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status || !['new', 'read', 'resolved'].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    
+    const feedback = await getFeedbackById(req.params.id);
+    if (!feedback) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    
+    await updateFeedbackStatus(req.params.id, status);
+    res.json({ message: "Feedback status updated successfully", status });
+  } catch (error) {
+    console.error("Update feedback status error:", error);
+    res.status(500).json({ message: "Failed to update feedback status" });
+  }
+});
+
+// Serve frontend (built Vite app) - only in production
+const distPath = path.join(__dirname, "dist");
+const hasDistFolder = fs.existsSync(distPath);
+
+if (hasDistFolder) {
+  app.use("/dawa", express.static(distPath));
+  app.use("/", express.static(distPath));
+
+  // SPA fallback (must be after all routes)
+  app.get("/dawa/*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+
+  // Root SPA fallback
+  app.get("/*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+} else {
+  // Development mode - just serve API, frontend is handled by Vite
+  app.get("/", (req, res) => {
+    res.json({ message: "Dawakaunka API Server. Frontend available at http://localhost:5174/" });
+  });
+}
 
 app.listen(port, () => {
   console.log(`Stripe API server running on http://localhost:${port}`);

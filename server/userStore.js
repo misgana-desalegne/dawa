@@ -36,6 +36,18 @@ async function initDB() {
   } catch (e) {
     // Column already exists
   }
+
+  // Create feedback table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS feedback (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      comment TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      status TEXT DEFAULT 'new'
+    )
+  `);
   
   saveDB();
 }
@@ -155,4 +167,63 @@ export function setUserRole(id, role) {
   }
   
   return updateUser(id, { role });
+}
+
+// Feedback functions
+export function addFeedback(feedback) {
+  db.run(
+    `INSERT INTO feedback (id, name, email, comment, createdAt, status)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [feedback.id, feedback.name, feedback.email, feedback.comment, feedback.createdAt, feedback.status || 'new']
+  );
+  saveDB();
+  return feedback;
+}
+
+export function getAllFeedback() {
+  const results = db.exec(
+    `SELECT id, name, email, comment, createdAt, status FROM feedback ORDER BY createdAt DESC`
+  );
+  
+  if (results.length > 0 && results[0].values) {
+    return results[0].values.map(row => ({
+      id: row[0],
+      name: row[1],
+      email: row[2],
+      comment: row[3],
+      createdAt: row[4],
+      status: row[5]
+    }));
+  }
+  return [];
+}
+
+export function getFeedbackById(id) {
+  const results = db.exec(
+    `SELECT id, name, email, comment, createdAt, status FROM feedback WHERE id = ?`,
+    [id]
+  );
+  
+  if (results.length > 0 && results[0].values.length > 0) {
+    const row = results[0].values[0];
+    return {
+      id: row[0],
+      name: row[1],
+      email: row[2],
+      comment: row[3],
+      createdAt: row[4],
+      status: row[5]
+    };
+  }
+  return null;
+}
+
+export function deleteFeedback(id) {
+  db.run(`DELETE FROM feedback WHERE id = ?`, [id]);
+  saveDB();
+}
+
+export function updateFeedbackStatus(id, status) {
+  db.run(`UPDATE feedback SET status = ? WHERE id = ?`, [status, id]);
+  saveDB();
 }
